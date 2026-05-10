@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Animated,
   Dimensions,
@@ -25,9 +27,11 @@ const CARD_WIDTH = SCREEN_WIDTH - 40;
 const CARD_HEIGHT = 340;
 const CARD_GAP = 16;
 const SNAP_INTERVAL = CARD_HEIGHT + CARD_GAP;
+const MOVE_XP_KEY = 'moveXP';
+const PRACTICE_TIME_LIMIT = 30;
 
 type Tab = 'moves' | 'styles' | 'quiz';
-type PracticePhase = 'idle' | 'active' | 'done';
+type PracticePhase = 'idle' | 'camera' | 'success';
 type QuizPhase = 'idle' | 'question' | 'feedback' | 'results';
 
 type Move = {
@@ -226,6 +230,9 @@ export default function LearnScreen() {
   const [practicePhase, setPracticePhase] = useState<PracticePhase>('idle');
   const [targetReps, setTargetReps] = useState(10);
   const [repCount, setRepCount] = useState(0);
+  const [permission, requestPermission] = useCameraPermissions();
+const [practiceTime, setPracticeTime] = useState(PRACTICE_TIME_LIMIT);
+const [moveXP, setMoveXP] = useState<Record<string, number>>({});
 
   // Quiz state
   const [quizPhase, setQuizPhase]           = useState<QuizPhase>('idle');
@@ -292,6 +299,34 @@ export default function LearnScreen() {
       r3.stop();
     };
   }, []);
+
+    useEffect(() => {
+    async function loadXP() {
+      const saved = await AsyncStorage.getItem(MOVE_XP_KEY);
+      setMoveXP(saved ? JSON.parse(saved) : {});
+    }
+
+    loadXP();
+  }, []);
+
+  // PUT practice timer useEffect here
+  useEffect(() => {
+    if (practicePhase !== 'camera') return;
+
+    const timer = setInterval(() => {
+      setPracticeTime((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          finishPractice();
+          return 0;
+        }
+
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [practicePhase]);
 
   const openDetail = (move: Move) => {
     setSelectedMove(move);
@@ -396,15 +431,20 @@ export default function LearnScreen() {
     resultsAccum.current = [];
   };
 
-  const countRep = () => {
-    const next = repCount + 1;
-    setRepCount(next);
-    Animated.sequence([
-      Animated.spring(repScale, { toValue: 1.4, tension: 300, friction: 5, useNativeDriver: true }),
-      Animated.spring(repScale, { toValue: 1, tension: 200, friction: 8, useNativeDriver: true }),
-    ]).start();
-    if (next >= targetReps) setPracticePhase('done');
+  async function finishPractice() {
+  if (!selectedMove) return;
+
+  const currentXP = moveXP[selectedMove.id] || 0;
+  const updatedXP = {
+    ...moveXP,
+    [selectedMove.id]: Math.min(currentXP + 25, 100),
   };
+
+  setMoveXP(updatedXP);
+  await AsyncStorage.setItem(MOVE_XP_KEY, JSON.stringify(updatedXP));
+
+  setPracticePhase('success');
+}
 
   const carouselPaddingV = Math.max(16, (carouselHeight - CARD_HEIGHT) / 2);
 
@@ -829,77 +869,81 @@ export default function LearnScreen() {
               ))}
             </View>
 
-            {/* — Practice flow — */}
             <View style={styles.practiceBlock}>
-              <Text style={styles.coachLabel}>PRACTICE</Text>
-              <View style={styles.coachDivider} />
+  <Text style={styles.coachLabel}>PRACTICE TRIAL</Text>
+  <View style={styles.coachDivider} />
 
-              {practicePhase === 'idle' && (
-                <>
-                  <Text style={styles.practiceSubLabel}>Select target reps</Text>
-                  <View style={styles.targetRow}>
-                    {TARGET_OPTIONS.map((t) => (
-                      <Pressable
-                        key={t}
-                        style={[styles.targetPill, targetReps === t && styles.targetPillActive]}
-                        onPress={() => setTargetReps(t)}
-                      >
-                        <Text style={[styles.targetPillText, targetReps === t && styles.targetPillTextActive]}>
-                          {t}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  <Pressable style={styles.startBtn} onPress={() => setPracticePhase('active')}>
-                    <Text style={styles.startBtnText}>Start Practice</Text>
-                  </Pressable>
-                </>
-              )}
+  <Text style={styles.practiceSubLabel}>
+    Match the overlay for 30 seconds to gain XP.
+  </Text>
 
-              {practicePhase === 'active' && (
-                <>
-                  <View style={styles.counterRow}>
-                    <Animated.Text style={[styles.repNumber, { transform: [{ scale: repScale }] }]}>
-                      {repCount}
-                    </Animated.Text>
-                    <Text style={styles.repTarget}> / {targetReps}</Text>
-                  </View>
-                  <View style={styles.repBarBg}>
-                    <View style={[styles.repBarFill, { width: `${(repCount / targetReps) * 100}%` as any }]} />
-                  </View>
-                  <Pressable style={styles.tapBtn} onPress={countRep}>
-                    <Text style={styles.tapBtnText}>TAP — REP DONE</Text>
-                  </Pressable>
-                  <Pressable onPress={() => { setPracticePhase('idle'); setRepCount(0); }}>
-                    <Text style={styles.stopLink}>Stop session</Text>
-                  </Pressable>
-                </>
-              )}
+  <View style={styles.repBarBg}>
+    <View
+      style={[
+        styles.repBarFill,
+        { width: `${moveXP[selectedMove.id] || 0}%` as any },
+      ]}
+    />
+  </View>
 
-              {practicePhase === 'done' && (
-                <>
-                  <View style={styles.doneBox}>
-                    <Text style={styles.doneCheck}>✓</Text>
-                    <Text style={styles.doneTitle}>Set Complete!</Text>
-                    <Text style={styles.doneSub}>{targetReps} reps of {selectedMove.name}</Text>
-                  </View>
-                  <View style={styles.doneActions}>
-                    <Pressable
-                      style={styles.againBtn}
-                      onPress={() => { setRepCount(0); setPracticePhase('active'); }}
-                    >
-                      <Text style={styles.againBtnText}>Go Again</Text>
-                    </Pressable>
-                    <Pressable
-                      style={styles.doneBtn}
-                      onPress={() => { setRepCount(0); setPracticePhase('idle'); }}
-                    >
-                      <Text style={styles.doneBtnText}>Done</Text>
-                    </Pressable>
-                  </View>
-                </>
-              )}
-            </View>
+  <Text style={styles.practiceSubLabel}>
+    Mastery XP: {moveXP[selectedMove.id] || 0}/100
+  </Text>
+
+  {practicePhase === 'idle' && (
+    <Pressable
+      style={styles.startBtn}
+      onPress={async () => {
+        if (!permission?.granted) {
+          const result = await requestPermission();
+          if (!result.granted) return;
+        }
+
+        setPracticeTime(PRACTICE_TIME_LIMIT);
+        setPracticePhase('camera');
+      }}
+    >
+      <Text style={styles.startBtnText}>Start Camera Trial</Text>
+    </Pressable>
+  )}
+
+  {practicePhase === 'camera' && (
+    <View style={styles.cameraBox}>
+      <CameraView style={styles.camera} facing="front" />
+
+      <View style={styles.moveOverlay}>
+        <Text style={styles.overlayMove}>{selectedMove.name}</Text>
+        <Text style={styles.overlayGuide}>Match this form</Text>
+      </View>
+
+      <View style={styles.practiceTimer}>
+        <Text style={styles.practiceTimerText}>{practiceTime}s</Text>
+      </View>
+
+      <Pressable style={styles.completePracticeBtn} onPress={finishPractice}>
+        <Text style={styles.startBtnText}>Finish Practice</Text>
+      </Pressable>
+    </View>
+  )}
+
+  {practicePhase === 'success' && (
+    <View style={styles.doneBox}>
+      <Text style={styles.doneCheck}>✓</Text>
+      <Text style={styles.doneTitle}>Trial Complete!</Text>
+      <Text style={styles.doneSub}>+25 XP for {selectedMove.name}</Text>
+
+      <Pressable
+        style={styles.startBtn}
+        onPress={() => {
+          setPracticeTime(PRACTICE_TIME_LIMIT);
+          setPracticePhase('idle');
+        }}
+      >
+        <Text style={styles.startBtnText}>Practice Again</Text>
+      </Pressable>
+    </View>
+  )}
+</View>
           </ScrollView>
         </Animated.View>
       )}
@@ -1438,4 +1482,72 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   styleKeywordText: { color: '#555', fontSize: 13, fontWeight: '600' },
+
+
+cameraBox: {
+  height: 420,
+  borderRadius: 20,
+  overflow: 'hidden',
+  backgroundColor: '#000',
+  marginTop: 16,
+},
+
+camera: {
+  flex: 1,
+},
+
+moveOverlay: {
+  position: 'absolute',
+  top: 70,
+  left: 40,
+  right: 40,
+  bottom: 90,
+  borderWidth: 3,
+  borderColor: 'rgba(255, 59, 48, 0.55)',
+  borderRadius: 30,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: 'rgba(255, 59, 48, 0.08)',
+},
+
+overlayMove: {
+  color: 'rgba(255,255,255,0.8)',
+  fontSize: 34,
+  fontWeight: '900',
+},
+
+overlayGuide: {
+  color: 'rgba(255,255,255,0.55)',
+  fontSize: 14,
+  fontWeight: '700',
+  marginTop: 8,
+},
+
+practiceTimer: {
+  position: 'absolute',
+  top: 16,
+  alignSelf: 'center',
+  backgroundColor: 'rgba(0,0,0,0.75)',
+  paddingHorizontal: 18,
+  paddingVertical: 8,
+  borderRadius: 20,
+},
+
+practiceTimerText: {
+  color: '#fff',
+  fontSize: 22,
+  fontWeight: '900',
+},
+
+completePracticeBtn: {
+  position: 'absolute',
+  bottom: 16,
+  left: 20,
+  right: 20,
+  backgroundColor: '#ff3b30',
+  paddingVertical: 16,
+  borderRadius: 16,
+  alignItems: 'center',
+},
+
 });
