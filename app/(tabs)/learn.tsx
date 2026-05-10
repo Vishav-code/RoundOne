@@ -310,7 +310,10 @@ const [moveXP, setMoveXP] = useState<Record<string, number>>({});
   const ring2 = useRef(new Animated.Value(0)).current;
   const ring3 = useRef(new Animated.Value(0)).current;
   const detailSlide = useRef(new Animated.Value(SCREEN_WIDTH)).current;
+  const styleDetailSlide = useRef(new Animated.Value(SCREEN_WIDTH)).current;
   const repScale = useRef(new Animated.Value(1)).current;
+
+  const [selectedStyle, setSelectedStyle] = useState<FightingStyle | null>(null);
 
   useEffect(() => {
     if (introHasPlayed || !showIntro) return;
@@ -396,6 +399,18 @@ const [moveXP, setMoveXP] = useState<Record<string, number>>({});
       setSelectedMove(null);
       setPracticePhase('idle');
       setRepCount(0);
+    });
+  };
+
+  const openStyleDetail = (style: FightingStyle) => {
+    setSelectedStyle(style);
+    styleDetailSlide.setValue(SCREEN_WIDTH);
+    Animated.spring(styleDetailSlide, { toValue: 0, tension: 65, friction: 11, useNativeDriver: true }).start();
+  };
+
+  const closeStyleDetail = () => {
+    Animated.timing(styleDetailSlide, { toValue: SCREEN_WIDTH, duration: 260, useNativeDriver: true }).start(() => {
+      setSelectedStyle(null);
     });
   };
 
@@ -665,31 +680,31 @@ const [moveXP, setMoveXP] = useState<Record<string, number>>({});
                 : '';
 
               return (
-                <Animated.View
+                <Pressable
                   key={style.id}
-                  style={[
-                    styles.moveCard,
-                    { transform: [{ scale }], opacity },
-                    index < FIGHTING_STYLES.length - 1 && { marginBottom: CARD_GAP },
-                  ]}
+                  onPress={() => !isStyleLocked && openStyleDetail(style)}
+                  disabled={isStyleLocked}
                 >
-                  <View style={[styles.animArea, isStyleLocked && styles.animAreaLocked]}>
-                    {isStyleLocked ? (
-                      <>
-                        <View style={[styles.typeBadge, styles.lockedBadge]}>
-                          <Text style={[styles.typeBadgeText, styles.lockedBadgeText]}>LOCKED</Text>
-                        </View>
-                        <View style={styles.lockBox}>
-                          <Text style={styles.lockBoxLabel}>LOCKED</Text>
-                        </View>
-                        <Text style={styles.lockPrereq}>Master the {stylePrereqName} first</Text>
-                      </>
-                    ) : (
-                      <>
-                        <View style={styles.typeBadge}>
-                          <Text style={styles.typeBadgeText}>{style.tag}</Text>
-                        </View>
-                        {(() => {
+                  <Animated.View
+                    style={[
+                      styles.moveCard,
+                      { transform: [{ scale }], opacity },
+                      index < FIGHTING_STYLES.length - 1 && { marginBottom: CARD_GAP },
+                    ]}
+                  >
+                    <View style={[styles.animArea, isStyleLocked && styles.animAreaLocked]}>
+                      {isStyleLocked ? (
+                        <>
+                          <View style={[styles.typeBadge, styles.lockedBadge]}>
+                            <Text style={[styles.typeBadgeText, styles.lockedBadgeText]}>LOCKED</Text>
+                          </View>
+                          <View style={styles.lockBox}>
+                            <Text style={styles.lockBoxLabel}>LOCKED</Text>
+                          </View>
+                          <Text style={styles.lockPrereq}>Master the {stylePrereqName} first</Text>
+                        </>
+                      ) : (
+                        (() => {
                           const src = style.videoKey ? VIDEO_MAP[style.videoKey] : null;
                           return src ? (
                             <Video
@@ -701,27 +716,29 @@ const [moveXP, setMoveXP] = useState<Record<string, number>>({});
                               isMuted
                             />
                           ) : (
-                            <View style={styles.styleKeywordsBox}>
-                              {style.keywords.map((kw) => (
-                                <View key={kw} style={styles.styleKeywordPill}>
-                                  <Text style={styles.styleKeywordText}>{kw}</Text>
-                                </View>
-                              ))}
-                            </View>
+                            <>
+                              <View style={styles.typeBadge}>
+                                <Text style={styles.typeBadgeText}>{style.tag}</Text>
+                              </View>
+                              <View style={styles.styleKeywordsBox}>
+                                {style.keywords.map((kw) => (
+                                  <View key={kw} style={styles.styleKeywordPill}>
+                                    <Text style={styles.styleKeywordText}>{kw}</Text>
+                                  </View>
+                                ))}
+                              </View>
+                            </>
                           );
-                        })()}
-                        <View style={styles.tapHint}>
-                          <Text style={styles.tapHintText}>FIGHTING STYLE</Text>
-                        </View>
-                      </>
-                    )}
-                  </View>
+                        })()
+                      )}
+                    </View>
 
-                  <View style={styles.moveInfo}>
-                    <Text style={[styles.moveName, isStyleLocked && styles.lockedText]}>{style.name}</Text>
-                    <Text style={styles.moveDesc}>{style.description}</Text>
-                  </View>
-                </Animated.View>
+                    <View style={styles.moveInfo}>
+                      <Text style={[styles.moveName, isStyleLocked && styles.lockedText]}>{style.name}</Text>
+                      <Text style={styles.moveDesc}>{style.description}</Text>
+                    </View>
+                  </Animated.View>
+                </Pressable>
               );
             })}
           </Animated.ScrollView>
@@ -1068,6 +1085,63 @@ const [moveXP, setMoveXP] = useState<Record<string, number>>({});
     </View>
   )}
 </View>
+          </ScrollView>
+        </Animated.View>
+      )}
+
+      {/* ── Style detail overlay ── */}
+      {selectedStyle && (
+        <Animated.View style={[styles.detailOverlay, { transform: [{ translateX: styleDetailSlide }] }]}>
+          <View style={styles.detailHeader}>
+            <Pressable onPress={closeStyleDetail} style={styles.backBtn}>
+              <Text style={styles.backBtnText}>← Back</Text>
+            </Pressable>
+            <View style={styles.typeBadge}>
+              <Text style={styles.typeBadgeText}>{selectedStyle.tag}</Text>
+            </View>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.detailScroll}>
+            <View style={styles.detailAnimArea}>
+              {(() => {
+                const src = selectedStyle.videoKey ? VIDEO_MAP[selectedStyle.videoKey] : null;
+                return src ? (
+                  <Video
+                    source={src}
+                    style={styles.detailVideo}
+                    resizeMode={ResizeMode.COVER}
+                    shouldPlay
+                    isLooping
+                    isMuted
+                  />
+                ) : (
+                  <View style={styles.detailAnimFrame}>
+                    <Text style={styles.detailAnimLabel}>Style Demo</Text>
+                    <Text style={styles.detailAnimSub}>placeholder</Text>
+                  </View>
+                );
+              })()}
+            </View>
+
+            <Text style={styles.detailTitle}>{selectedStyle.name}</Text>
+
+            <View style={styles.coachBlock}>
+              <Text style={styles.coachLabel}>ABOUT THIS STYLE</Text>
+              <View style={styles.coachDivider} />
+              <Text style={styles.coachBody}>{selectedStyle.description}</Text>
+            </View>
+
+            <View style={styles.coachBlock}>
+              <Text style={styles.coachLabel}>KEY ATTRIBUTES</Text>
+              <View style={styles.coachDivider} />
+              <View style={styles.styleKeywordsBox}>
+                {selectedStyle.keywords.map((kw) => (
+                  <View key={kw} style={styles.styleKeywordPill}>
+                    <Text style={styles.styleKeywordText}>{kw}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
           </ScrollView>
         </Animated.View>
       )}

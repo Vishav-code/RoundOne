@@ -67,6 +67,11 @@ export default function HomeScreen() {
         <Text style={styles.appLabel}>ROUND ONE</Text>
         <Text style={styles.welcomeGreet}>WELCOME,</Text>
         <Text style={styles.fighterName}>{welcomeName}</Text>
+        {profile?.style ? (
+          <View style={styles.styleBadge}>
+            <Text style={styles.styleBadgeText}>{profile.style.toUpperCase()}</Text>
+          </View>
+        ) : null}
         <View style={styles.headerDivider} />
       </View>
 
@@ -380,5 +385,22 @@ const styles = StyleSheet.create({
   strikeMax: {
     color: '#444',
     fontWeight: '600',
+  },
+
+  styleBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    backgroundColor: '#1a0000',
+    borderWidth: 1,
+    borderColor: '#ff3b30',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  styleBadgeText: {
+    color: '#ff3b30',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2,
   },
 });
