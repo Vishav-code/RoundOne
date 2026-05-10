@@ -184,10 +184,27 @@ const MOVES: Move[] = [
 ];
 
 const FIGHTING_STYLES = [
-  { name: 'Out-Fighter', description: 'Fights from range using jabs and footwork to control distance and avoid brawls.' },
-  { name: 'Pressure Fighter', description: 'Constantly pushes forward, cutting off the ring and overwhelming opponents with volume.' },
-  { name: 'Counter Striker', description: 'Waits for opponent mistakes then capitalizes with precise, powerful counters.' },
-  { name: 'Kicker', description: 'Relies heavily on kicks to score and damage from mid-range, keeping punchers at bay.' },
+  {
+    id: '1',
+    name: 'Out-Fighter',
+    tag: 'RANGE GAME',
+    description: 'Fights from range using jabs and footwork to control distance and avoid brawls.',
+    keywords: ['Jab', 'Footwork', 'Angles', 'Counter'],
+  },
+  {
+    id: '2',
+    name: 'Pressure Fighter',
+    tag: 'FORWARD PRESSURE',
+    description: 'Constantly pushes forward, cutting off the ring and overwhelming opponents with volume.',
+    keywords: ['Volume', 'Cut the ring', 'Body work', 'Clinch'],
+  },
+  {
+    id: '3',
+    name: 'Counter Striker',
+    tag: 'PATIENCE',
+    description: 'Waits for opponent mistakes then capitalizes with precise, powerful counters.',
+    keywords: ['Slip', 'Roll', 'Bait', 'Timing'],
+  },
 ];
 
 const TAB_LABELS: Record<Tab, string> = {
@@ -221,7 +238,11 @@ export default function LearnScreen() {
   const questionStartTime                   = useRef(0);
   const timerRef                            = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const scrollY = useRef(new Animated.Value(0)).current;
+  const [activeIndexStyles, setActiveIndexStyles]     = useState(0);
+  const [carouselHeightStyles, setCarouselHeightStyles] = useState(500);
+
+  const scrollY       = useRef(new Animated.Value(0)).current;
+  const scrollYStyles = useRef(new Animated.Value(0)).current;
   const introOpacity = useRef(new Animated.Value(0)).current;
   const textScale = useRef(new Animated.Value(0.4)).current;
   const ring1 = useRef(new Animated.Value(0)).current;
@@ -487,16 +508,86 @@ export default function LearnScreen() {
         </View>
       )}
 
-      {/* Fighting Styles */}
+      {/* Fighting Styles — vertical snap carousel */}
       {activeTab === 'styles' && (
-        <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-          {FIGHTING_STYLES.map((style) => (
-            <View key={style.name} style={styles.styleCard}>
-              <Text style={styles.styleCardTitle}>{style.name}</Text>
-              <Text style={styles.styleCardDesc}>{style.description}</Text>
-            </View>
-          ))}
-        </ScrollView>
+        <View
+          style={styles.carouselContainer}
+          onLayout={(e) => setCarouselHeightStyles(e.nativeEvent.layout.height)}
+        >
+          <Animated.ScrollView
+            showsVerticalScrollIndicator={false}
+            snapToInterval={SNAP_INTERVAL}
+            snapToAlignment="start"
+            decelerationRate="fast"
+            contentContainerStyle={{
+              paddingVertical: Math.max(16, (carouselHeightStyles - CARD_HEIGHT) / 2),
+              alignItems: 'center',
+            }}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { y: scrollYStyles } } }],
+              { useNativeDriver: false }
+            )}
+            scrollEventThrottle={16}
+            onMomentumScrollEnd={(e) => {
+              const index = Math.round(e.nativeEvent.contentOffset.y / SNAP_INTERVAL);
+              setActiveIndexStyles(Math.max(0, Math.min(index, FIGHTING_STYLES.length - 1)));
+            }}
+          >
+            {FIGHTING_STYLES.map((style, index) => {
+              const inputRange = [
+                (index - 1) * SNAP_INTERVAL,
+                index * SNAP_INTERVAL,
+                (index + 1) * SNAP_INTERVAL,
+              ];
+              const scale   = scrollYStyles.interpolate({ inputRange, outputRange: [0.85, 1, 0.85], extrapolate: 'clamp' });
+              const opacity = scrollYStyles.interpolate({ inputRange, outputRange: [0.45, 1, 0.45], extrapolate: 'clamp' });
+
+              return (
+                <Animated.View
+                  key={style.id}
+                  style={[
+                    styles.moveCard,
+                    { transform: [{ scale }], opacity },
+                    index < FIGHTING_STYLES.length - 1 && { marginBottom: CARD_GAP },
+                  ]}
+                >
+                  {/* Visual area */}
+                  <View style={styles.animArea}>
+                    <View style={styles.typeBadge}>
+                      <Text style={styles.typeBadgeText}>{style.tag}</Text>
+                    </View>
+                    <View style={styles.styleKeywordsBox}>
+                      {style.keywords.map((kw) => (
+                        <View key={kw} style={styles.styleKeywordPill}>
+                          <Text style={styles.styleKeywordText}>{kw}</Text>
+                        </View>
+                      ))}
+                    </View>
+                    <View style={styles.tapHint}>
+                      <Text style={styles.tapHintText}>FIGHTING STYLE</Text>
+                    </View>
+                  </View>
+
+                  {/* Info */}
+                  <View style={styles.moveInfo}>
+                    <Text style={styles.moveName}>{style.name}</Text>
+                    <Text style={styles.moveDesc}>{style.description}</Text>
+                  </View>
+                </Animated.View>
+              );
+            })}
+          </Animated.ScrollView>
+
+          {/* Side dots */}
+          <View style={styles.dotsColumn}>
+            {FIGHTING_STYLES.map((_, i) => (
+              <View
+                key={i}
+                style={[styles.dot, i === activeIndexStyles ? styles.dotActive : styles.dotInactive]}
+              />
+            ))}
+          </View>
+        </View>
       )}
 
       {/* ── Fight IQ Quiz ── */}
@@ -1330,4 +1421,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   leaderboardText: { color: '#444', fontSize: 13, fontWeight: '700' },
+
+  // Fighting styles carousel
+  styleKeywordsBox: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+  },
+  styleKeywordPill: {
+    borderWidth: 1,
+    borderColor: '#2a2a2a',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  styleKeywordText: { color: '#555', fontSize: 13, fontWeight: '600' },
 });
