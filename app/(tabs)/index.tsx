@@ -1,302 +1,153 @@
-import { useState } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-type FighterProfile = {
-  name: string;
-  age: string;
-  height: string;
-  weight: string;
-  reach: string;
-  experience: string;
-  goal: string;
-  style: string;
+import { useProfile } from '@/context/ProfileContext';
+
+const LEADERBOARD = [
+  { rank: 1, name: 'DragonFist_Pro', fightIQ: 1420, spar: 890 },
+  { rank: 2, name: 'IronGlove_K', fightIQ: 1310, spar: 820 },
+  { rank: 3, name: 'ShadowKicker99', fightIQ: 1280, spar: 760 },
+  { rank: 4, name: 'ThaiBoxer_X', fightIQ: 1150, spar: 710 },
+  { rank: 5, name: 'NightHawk', fightIQ: 1090, spar: 650 },
+  { rank: 6, name: 'RoninStrike', fightIQ: 980, spar: 590 },
+  { rank: 7, name: 'BlitzKing77', fightIQ: 920, spar: 540 },
+  { rank: 8, name: 'JabMachine', fightIQ: 860, spar: 490 },
+  { rank: 9, name: 'ViperKick', fightIQ: 790, spar: 420 },
+  { rank: 10, name: 'WildCard_88', fightIQ: 720, spar: 380 },
+];
+
+const STRIKES = [
+  { label: 'Jab', current: 1, max: 15 },
+  { label: 'Cross', current: 1, max: 15 },
+  { label: 'Hook', current: 1, max: 15 },
+  { label: 'Uppercut', current: 1, max: 15 },
+  { label: 'Teep', current: 1, max: 15 },
+  { label: 'Low Kick', current: 1, max: 15 },
+  { label: 'Body Kick', current: 1, max: 15 },
+];
+
+const MEDAL_COLORS: Record<number, string> = {
+  1: '#FFD700',
+  2: '#C0C0C0',
+  3: '#CD7F32',
 };
 
+function RankBadge({ rank }: { rank: number }) {
+  const isTop3 = rank <= 3;
+  return (
+    <View
+      style={[
+        styles.badge,
+        isTop3 ? { backgroundColor: MEDAL_COLORS[rank] } : styles.badgePlain,
+      ]}
+    >
+      <Text style={[styles.badgeText, !isTop3 && { color: '#555' }]}>{rank}</Text>
+    </View>
+  );
+}
+
+function StatBar({ current, max }: { current: number; max: number }) {
+  const pct = Math.min(current / max, 1) * 100;
+  return (
+    <View style={styles.barTrack}>
+      <View style={[styles.barFill, { width: `${pct}%` as `${number}%` }]} />
+    </View>
+  );
+}
+
 export default function HomeScreen() {
-  const [name, setName] = useState('');
-  const [age, setAge] = useState('');
-  const [height, setHeight] = useState('');
-  const [weight, setWeight] = useState('');
-  const [reach, setReach] = useState('');
-  const [experience, setExperience] = useState('');
-  const [goal, setGoal] = useState('');
-  const [style, setStyle] = useState('');
-
-  const [profileSaved, setProfileSaved] = useState(false);
-  const [fighterProfile, setFighterProfile] = useState<FighterProfile | null>(null);
-
-  function saveProfile() {
-    if (!name || !age || !height || !weight || !reach || !experience || !goal || !style) {
-      Alert.alert('Missing Info', 'Please fill out all profile fields before continuing.');
-      return;
-    }
-
-    const profile: FighterProfile = {
-      name,
-      age,
-      height,
-      weight,
-      reach,
-      experience,
-      goal,
-      style,
-    };
-
-    setFighterProfile(profile);
-    setProfileSaved(true);
-  }
-
-  function getRecommendedFocus() {
-    if (!fighterProfile) {
-      return 'Start with basic stance, jab-cross, defense, and simple movement.';
-    }
-
-    if (fighterProfile.style === 'Out-fighter') {
-      return 'Use your jab, teep, and footwork to control distance. Stay long, keep your opponent at the end of your strikes, and reset after every combo.';
-    }
-
-    if (fighterProfile.style === 'Pressure fighter') {
-      return 'Work on forward pressure, body shots, low kicks, and cutting off angles. Your goal is to stay active without walking straight into counters.';
-    }
-
-    if (fighterProfile.style === 'Counter striker') {
-      return 'Focus on slipping, blocking, and returning counters quickly. Let the opponent miss, then answer with clean shots.';
-    }
-
-    if (fighterProfile.style === 'Kicker') {
-      return 'Practice teeps, low kicks, body kicks, and distance management. Use your legs to control range before entering with punches.';
-    }
-
-    return 'Start with basic stance, jab-cross, defense, and simple movement. The app can help you discover your fighting style as you train.';
-  }
-
-  if (profileSaved && fighterProfile) {
-    return (
-      <ScrollView style={styles.page} contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.appName}>AI Kickboxing Coach</Text>
-          <Text style={styles.title}>Welcome, {fighterProfile.name}</Text>
-          <Text style={styles.subtitle}>
-            Your fighter profile is ready. Today&apos;s training is personalized around your goal,
-            experience, and fighting style.
-          </Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Your Fighter Profile</Text>
-
-          <View style={styles.profileRow}>
-            <Text style={styles.profileLabel}>Experience</Text>
-            <Text style={styles.profileValue}>{fighterProfile.experience}</Text>
-          </View>
-
-          <View style={styles.profileRow}>
-            <Text style={styles.profileLabel}>Goal</Text>
-            <Text style={styles.profileValue}>{fighterProfile.goal}</Text>
-          </View>
-
-          <View style={styles.profileRow}>
-            <Text style={styles.profileLabel}>Style</Text>
-            <Text style={styles.profileValue}>{fighterProfile.style}</Text>
-          </View>
-
-          <View style={styles.profileRow}>
-            <Text style={styles.profileLabel}>Height</Text>
-            <Text style={styles.profileValue}>{fighterProfile.height}</Text>
-          </View>
-
-          <View style={styles.profileRow}>
-            <Text style={styles.profileLabel}>Weight</Text>
-            <Text style={styles.profileValue}>{fighterProfile.weight}</Text>
-          </View>
-
-          <View style={styles.profileRow}>
-            <Text style={styles.profileLabel}>Reach</Text>
-            <Text style={styles.profileValue}>{fighterProfile.reach}</Text>
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Today&apos;s Recommended Focus</Text>
-          <Text style={styles.recommendationText}>{getRecommendedFocus()}</Text>
-        </View>
-
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Workouts</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>50</Text>
-            <Text style={styles.statLabel}>Fight IQ</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>Bronze</Text>
-            <Text style={styles.statLabel}>Rank</Text>
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Quick Start</Text>
-
-          <Pressable style={styles.menuButton}>
-            <Text style={styles.menuButtonText}>Start Training</Text>
-            <Text style={styles.menuButtonSubtext}>Generate a workout based on your profile</Text>
-          </Pressable>
-
-          <Pressable style={styles.menuButton}>
-            <Text style={styles.menuButtonText}>Learn Moves</Text>
-            <Text style={styles.menuButtonSubtext}>Practice jabs, teeps, kicks, and defense</Text>
-          </Pressable>
-
-          <Pressable style={styles.menuButton}>
-            <Text style={styles.menuButtonText}>Virtual Spar</Text>
-            <Text style={styles.menuButtonSubtext}>React to attacks and earn a rank</Text>
-          </Pressable>
-
-          <Pressable style={styles.menuButton}>
-            <Text style={styles.menuButtonText}>Fight IQ Quiz</Text>
-            <Text style={styles.menuButtonSubtext}>Answer fight scenarios and improve your score</Text>
-          </Pressable>
-        </View>
-
-        <Pressable style={styles.secondaryButton} onPress={() => setProfileSaved(false)}>
-          <Text style={styles.secondaryButtonText}>Edit Fighter Profile</Text>
-        </Pressable>
-      </ScrollView>
-    );
-  }
+  const { profile } = useProfile();
+  const displayName = profile?.name?.trim() ?? '';
+  const welcomeName = displayName ? displayName.toUpperCase() : 'UNKNOWN FIGHTER';
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
+
+      {/* ── Header ── */}
       <View style={styles.header}>
-        <Text style={styles.appName}>AI Kickboxing Coach</Text>
-        <Text style={styles.title}>Build Your Fighter Profile</Text>
-        <Text style={styles.subtitle}>
-          We use this information to personalize your workouts, fighting style, and training plan.
-        </Text>
+        <Text style={styles.appLabel}>ROUND ONE</Text>
+        <Text style={styles.welcomeGreet}>WELCOME,</Text>
+        <Text style={styles.fighterName}>{welcomeName}</Text>
+        <View style={styles.headerDivider} />
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Basic Info</Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Name"
-          placeholderTextColor="#777"
-          value={name}
-          onChangeText={setName}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Age"
-          placeholderTextColor="#777"
-          keyboardType="numeric"
-          value={age}
-          onChangeText={setAge}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Height, example: 6'6"
-          placeholderTextColor="#777"
-          value={height}
-          onChangeText={setHeight}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Weight, example: 205 lb"
-          placeholderTextColor="#777"
-          value={weight}
-          onChangeText={setWeight}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Reach, example: 80 in"
-          placeholderTextColor="#777"
-          value={reach}
-          onChangeText={setReach}
-        />
+      {/* ── Recent Workouts ── */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>/ RECENT WORKOUTS</Text>
+        <View style={styles.card}>
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIconBox}>
+              <Text style={styles.emptyIconText}>0</Text>
+              <Text style={styles.emptyIconSub}>SESSIONS</Text>
+            </View>
+            <Text style={styles.emptyTitle}>No workouts logged yet</Text>
+            <Text style={styles.emptySubtitle}>
+              Head to the Train tab to generate and log your first session.
+            </Text>
+          </View>
+        </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Experience Level</Text>
+      {/* ── Leaderboard ── */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>/ LEADERBOARD</Text>
+        <View style={styles.card}>
 
-        <View style={styles.optionGrid}>
-          {['Beginner', 'Learner', 'Intermediate', 'Advanced'].map((item) => (
-            <Pressable
-              key={item}
-              style={[styles.optionButton, experience === item && styles.selectedButton]}
-              onPress={() => setExperience(item)}
+          {/* Column headers */}
+          <View style={styles.lbHeaderRow}>
+            <View style={styles.badgeSpacer} />
+            <Text style={[styles.lbColHead, { flex: 1 }]}>FIGHTER</Text>
+            <Text style={[styles.lbColHead, styles.lbColRight]}>IQ</Text>
+            <Text style={[styles.lbColHead, styles.lbColRight]}>SPAR</Text>
+          </View>
+
+          {LEADERBOARD.map((entry, i) => (
+            <View
+              key={entry.rank}
+              style={[styles.lbRow, i === LEADERBOARD.length - 1 && styles.lbRowLast]}
             >
-              <Text style={[styles.optionText, experience === item && styles.selectedText]}>
-                {item}
+              <RankBadge rank={entry.rank} />
+              <Text style={[styles.lbName, { flex: 1 }]} numberOfLines={1}>
+                {entry.name}
               </Text>
-            </Pressable>
+              <Text style={styles.lbScore}>{entry.fightIQ}</Text>
+              <Text style={styles.lbScore}>{entry.spar}</Text>
+            </View>
+          ))}
+
+          {/* User row */}
+          <View style={styles.lbUserRow}>
+            <View style={[styles.badge, styles.userBadge]}>
+              <Text style={[styles.badgeText, { color: '#ff3b30' }]}>11</Text>
+            </View>
+            <Text style={[styles.lbName, styles.lbUserName, { flex: 1 }]} numberOfLines={1}>
+              {displayName || 'YOU'}
+            </Text>
+            <Text style={[styles.lbScore, { color: '#ff3b30' }]}>50</Text>
+            <Text style={[styles.lbScore, { color: '#ff3b30' }]}>0</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* ── Strike Log ── */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>/ STRIKE LOG</Text>
+        <View style={styles.card}>
+          {STRIKES.map((s, i) => (
+            <View
+              key={s.label}
+              style={[styles.strikeRow, i === STRIKES.length - 1 && styles.strikeRowLast]}
+            >
+              <Text style={styles.strikeLabel}>{s.label}</Text>
+              <StatBar current={s.current} max={s.max} />
+              <Text style={styles.strikeCount}>
+                {s.current}
+                <Text style={styles.strikeMax}>/{s.max}</Text>
+              </Text>
+            </View>
           ))}
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Main Goal</Text>
-
-        <View style={styles.optionGrid}>
-          {[
-            'Learn basics',
-            'Improve combos',
-            'Improve defense',
-            'Improve cardio',
-            'Prepare for sparring',
-          ].map((item) => (
-            <Pressable
-              key={item}
-              style={[styles.optionButton, goal === item && styles.selectedButton]}
-              onPress={() => setGoal(item)}
-            >
-              <Text style={[styles.optionText, goal === item && styles.selectedText]}>
-                {item}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Fighting Style</Text>
-
-        <View style={styles.optionGrid}>
-          {['Out-fighter', 'Pressure fighter', 'Counter striker', 'Kicker', 'Not sure yet'].map(
-            (item) => (
-              <Pressable
-                key={item}
-                style={[styles.optionButton, style === item && styles.selectedButton]}
-                onPress={() => setStyle(item)}
-              >
-                <Text style={[styles.optionText, style === item && styles.selectedText]}>
-                  {item}
-                </Text>
-              </Pressable>
-            )
-          )}
-        </View>
-      </View>
-
-      <Pressable style={styles.saveButton} onPress={saveProfile}>
-        <Text style={styles.saveButtonText}>Save Fighter Profile</Text>
-      </Pressable>
     </ScrollView>
   );
 }
@@ -304,202 +155,230 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: '#101010',
+    backgroundColor: '#0a0a0a',
   },
-
   content: {
-    padding: 20,
-    paddingBottom: 40,
+    paddingHorizontal: 18,
+    paddingBottom: 50,
   },
 
+  /* Header */
   header: {
-    marginTop: 30,
-    marginBottom: 20,
+    marginTop: 40,
+    marginBottom: 28,
   },
-
-  appName: {
+  appLabel: {
     color: '#ff3b30',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 3,
+    marginBottom: 10,
+  },
+  welcomeGreet: {
+    color: '#444',
     fontSize: 16,
     fontWeight: '700',
-    marginBottom: 8,
-    textTransform: 'uppercase',
+    letterSpacing: 2,
+    marginBottom: 4,
+  },
+  fighterName: {
+    color: '#ffffff',
+    fontSize: 36,
+    fontWeight: '900',
     letterSpacing: 1,
+    lineHeight: 42,
+  },
+  headerDivider: {
+    height: 2,
+    backgroundColor: '#ff3b30',
+    width: 40,
+    marginTop: 16,
+    borderRadius: 2,
   },
 
-  title: {
-    color: '#ffffff',
-    fontSize: 32,
-    fontWeight: '800',
+  /* Sections */
+  section: {
+    marginBottom: 22,
+  },
+  sectionLabel: {
+    color: '#ff3b30',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
     marginBottom: 10,
   },
 
-  subtitle: {
-    color: '#b5b5b5',
-    fontSize: 16,
-    lineHeight: 22,
-  },
-
+  /* Card */
   card: {
-    backgroundColor: '#1b1b1b',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: '#111111',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#1c1c1c',
+    overflow: 'hidden',
+  },
+
+  /* Empty state */
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+  },
+  emptyIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: '#222',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
   },
-
-  sectionTitle: {
-    color: '#ffffff',
+  emptyIconText: {
+    color: '#333',
     fontSize: 20,
+    fontWeight: '900',
+  },
+  emptyIconSub: {
+    color: '#333',
+    fontSize: 7,
     fontWeight: '700',
-    marginBottom: 12,
+    letterSpacing: 1,
+  },
+  emptyTitle: {
+    color: '#555',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  emptySubtitle: {
+    color: '#333',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
   },
 
-  input: {
-    backgroundColor: '#111111',
+  /* Leaderboard */
+  lbHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a1a1a',
+  },
+  badgeSpacer: {
+    width: 30,
+    marginRight: 10,
+  },
+  lbColHead: {
+    color: '#444',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
+  lbColRight: {
+    width: 46,
+    textAlign: 'right',
+  },
+  lbRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: '#161616',
+  },
+  lbRowLast: {
+    borderBottomWidth: 0,
+  },
+  lbUserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: '#160404',
+    borderTopWidth: 1,
+    borderTopColor: '#2a0a0a',
+  },
+  badge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  badgePlain: {
+    backgroundColor: '#1a1a1a',
+  },
+  userBadge: {
+    backgroundColor: '#1a0000',
     borderWidth: 1,
-    borderColor: '#333333',
-    borderRadius: 12,
-    padding: 14,
-    color: '#ffffff',
-    fontSize: 16,
-    marginBottom: 12,
-  },
-
-  optionGrid: {
-    gap: 10,
-  },
-
-  optionButton: {
-    backgroundColor: '#111111',
-    borderWidth: 1,
-    borderColor: '#333333',
-    borderRadius: 12,
-    padding: 14,
-  },
-
-  selectedButton: {
-    backgroundColor: '#ff3b30',
     borderColor: '#ff3b30',
   },
-
-  optionText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-
-  selectedText: {
-    color: '#ffffff',
-  },
-
-  saveButton: {
-    backgroundColor: '#ff3b30',
-    borderRadius: 16,
-    padding: 18,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-
-  saveButtonText: {
-    color: '#ffffff',
-    fontSize: 18,
+  badgeText: {
+    color: '#000',
+    fontSize: 11,
     fontWeight: '800',
   },
-
-  profileRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#2a2a2a',
-    paddingVertical: 10,
-    gap: 12,
-  },
-
-  profileLabel: {
-    color: '#a5a5a5',
-    fontSize: 15,
+  lbName: {
+    color: '#ccc',
+    fontSize: 13,
     fontWeight: '600',
+    marginRight: 6,
   },
-
-  profileValue: {
-    color: '#ffffff',
-    fontSize: 15,
+  lbUserName: {
+    color: '#ff3b30',
     fontWeight: '700',
-    flex: 1,
+  },
+  lbScore: {
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '700',
+    width: 46,
     textAlign: 'right',
   },
 
-  recommendationText: {
-    color: '#ffffff',
-    fontSize: 17,
-    lineHeight: 24,
-    fontWeight: '600',
-  },
-
-  statsContainer: {
+  /* Strike Log */
+  strikeRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
-
-  statCard: {
-    flex: 1,
-    backgroundColor: '#1b1b1b',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: '#161616',
+    gap: 12,
   },
-
-  statNumber: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '800',
-    marginBottom: 4,
+  strikeRowLast: {
+    borderBottomWidth: 0,
   },
-
-  statLabel: {
-    color: '#a5a5a5',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-
-  menuButton: {
-    backgroundColor: '#111111',
-    borderWidth: 1,
-    borderColor: '#333333',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 10,
-  },
-
-  menuButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-
-  menuButtonSubtext: {
-    color: '#999999',
+  strikeLabel: {
+    color: '#888',
     fontSize: 13,
-    lineHeight: 18,
+    fontWeight: '600',
+    width: 68,
   },
-
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: '#ff3b30',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 4,
+  barTrack: {
+    flex: 1,
+    height: 4,
+    backgroundColor: '#1e1e1e',
+    borderRadius: 2,
+    overflow: 'hidden',
   },
-
-  secondaryButtonText: {
-    color: '#ff3b30',
-    fontSize: 16,
+  barFill: {
+    height: '100%',
+    backgroundColor: '#ff3b30',
+    borderRadius: 2,
+  },
+  strikeCount: {
+    color: '#ffffff',
+    fontSize: 13,
     fontWeight: '800',
+    width: 38,
+    textAlign: 'right',
+  },
+  strikeMax: {
+    color: '#444',
+    fontWeight: '600',
   },
 });
