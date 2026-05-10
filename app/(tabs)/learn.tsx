@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ResizeMode, Video } from 'expo-av';
+import VIDEO_MAP from '../../assets/videos/videoMap';
 import {
   Animated,
   Dimensions,
@@ -42,6 +44,18 @@ type Move = {
   whatItIs: string;
   whenToUse: string[];
   commonMistakes: string[];
+  lockedBehind?: string;
+  videoKey?: string;
+};
+
+type FightingStyle = {
+  id: string;
+  name: string;
+  tag: string;
+  description: string;
+  keywords: string[];
+  lockedBehind?: string;
+  videoKey?: string;
 };
 
 const MOVES: Move[] = [
@@ -49,6 +63,7 @@ const MOVES: Move[] = [
     id: '1',
     name: 'Jab',
     type: 'Punch',
+    videoKey: 'jab',
     description: 'A quick, straight punch with your lead hand to gauge distance.',
     whatItIs:
       "The jab is your most important weapon — a straight punch thrown with the lead hand. It sets up every combo, controls range, and disrupts your opponent's rhythm without overcommitting.",
@@ -69,6 +84,7 @@ const MOVES: Move[] = [
     id: '2',
     name: 'Cross',
     type: 'Punch',
+    videoKey: 'cross',
     description: 'A powerful straight punch with your rear hand, generating full body rotation.',
     whatItIs:
       'The cross is your power shot. Thrown with the rear hand, it uses full hip and shoulder rotation to generate maximum force. Usually lands as the "2" after a jab.',
@@ -89,6 +105,7 @@ const MOVES: Move[] = [
     id: '3',
     name: 'Hook',
     type: 'Punch',
+    videoKey: 'right_hook',
     description: 'A lateral punch with a bent elbow targeting the head or body.',
     whatItIs:
       "The hook travels in a horizontal arc with the elbow bent at roughly 90°. It's designed to get around an opponent's guard and can target the head, ear, or body with devastating effect.",
@@ -109,6 +126,7 @@ const MOVES: Move[] = [
     id: '4',
     name: 'Uppercut',
     type: 'Punch',
+    videoKey: 'uppercut',
     description: 'An upward punch targeting the chin from close range.',
     whatItIs:
       "The uppercut travels vertically upward, targeting the chin or solar plexus. It's a close-range weapon that's hardest to see coming and often ends fights when it connects cleanly.",
@@ -129,6 +147,7 @@ const MOVES: Move[] = [
     id: '5',
     name: 'Teep',
     type: 'Kick',
+    videoKey: 'front_kick',
     description: 'A front push kick that controls distance and disrupts balance.',
     whatItIs:
       "The teep is Muay Thai's equivalent of the jab. It's a straight push kick thrown with the ball of the foot that keeps opponents at range, breaks their rhythm, and drains their energy over time.",
@@ -149,6 +168,7 @@ const MOVES: Move[] = [
     id: '6',
     name: 'Low Kick',
     type: 'Kick',
+    videoKey: 'leg_kick',
     description: "A kick targeting the opponent's thigh to slow them down.",
     whatItIs:
       "The low kick strikes the outside of the opponent's thigh with the shin. Repeated low kicks damage leg muscles, disrupt footwork, and slow the opponent considerably by the later rounds.",
@@ -169,6 +189,7 @@ const MOVES: Move[] = [
     id: '7',
     name: 'Body Kick',
     type: 'Kick',
+    videoKey: 'round_kick',
     description: 'A powerful roundhouse kick aimed at the ribs or midsection.',
     whatItIs:
       'The body kick targets the liver, ribs, or floating ribs with the shin. A clean liver kick can drop anyone regardless of size — it is one of the most decisive weapons in kickboxing.',
@@ -185,13 +206,35 @@ const MOVES: Move[] = [
       'Kicking flat-footed with no hip rotation',
     ],
   },
+  {
+    id: 'flicker_jab',
+    name: 'Flicker Jab',
+    type: 'Punch',
+    lockedBehind: '1',
+    description: 'A rapid, whipping jab thrown in quick bursts to blind and disrupt — made famous by Thomas "Hitman" Hearns.',
+    whatItIs:
+      'The flicker jab is an advanced variation of the jab popularized by Thomas "Hitman" Hearns. Unlike the standard snapping jab, it\'s thrown with a loose, whipping arm extension in rapid succession. The goal is not damage — it\'s disruption. It blinds the opponent, kills their rhythm, and creates the exact window for a devastating rear hand.',
+    whenToUse: [
+      "To obstruct your opponent's vision before loading the right hand",
+      'When your opponent has timed your standard jab and is slipping it',
+      'To maintain constant activity without fully committing',
+      'Setting up angles — flicker left, pivot, cross right',
+    ],
+    commonMistakes: [
+      "Throwing with power — it's a disruption tool, not a finisher",
+      'Dropping the rear hand guard while flickering',
+      'Using it without a follow-up — must set up the next shot',
+      'Dropping the elbow, which telegraphs and slows the motion',
+    ],
+  },
 ];
 
-const FIGHTING_STYLES = [
+const FIGHTING_STYLES: FightingStyle[] = [
   {
     id: '1',
     name: 'Out-Fighter',
     tag: 'RANGE GAME',
+    videoKey: 'outboxer',
     description: 'Fights from range using jabs and footwork to control distance and avoid brawls.',
     keywords: ['Jab', 'Footwork', 'Angles', 'Counter'],
   },
@@ -199,6 +242,7 @@ const FIGHTING_STYLES = [
     id: '2',
     name: 'Pressure Fighter',
     tag: 'FORWARD PRESSURE',
+    videoKey: 'pressure_fighter',
     description: 'Constantly pushes forward, cutting off the ring and overwhelming opponents with volume.',
     keywords: ['Volume', 'Cut the ring', 'Body work', 'Clinch'],
   },
@@ -206,8 +250,18 @@ const FIGHTING_STYLES = [
     id: '3',
     name: 'Counter Striker',
     tag: 'PATIENCE',
+    videoKey: 'counter_striker',
     description: 'Waits for opponent mistakes then capitalizes with precise, powerful counters.',
     keywords: ['Slip', 'Roll', 'Bait', 'Timing'],
+  },
+  {
+    id: '4',
+    name: 'Hitman Style',
+    tag: 'REACH & POWER',
+    videoKey: 'hitman',
+    description: "Thomas Hearns' signature style — an upright stance that weaponizes extreme reach through the flicker jab and an explosive rear right hand.",
+    keywords: ['Reach', 'Flicker Jab', 'Right Hand', 'Upright'],
+    lockedBehind: 'flicker_jab',
   },
 ];
 
@@ -505,9 +559,13 @@ const [moveXP, setMoveXP] = useState<Record<string, number>>({});
               ];
               const scale = scrollY.interpolate({ inputRange, outputRange: [0.85, 1, 0.85], extrapolate: 'clamp' });
               const opacity = scrollY.interpolate({ inputRange, outputRange: [0.45, 1, 0.45], extrapolate: 'clamp' });
+              const isLocked = !!move.lockedBehind && (moveXP[move.lockedBehind] ?? 0) < 100;
+              const prereqName = isLocked
+                ? (MOVES.find(m => m.id === move.lockedBehind)?.name ?? 'previous move')
+                : '';
 
               return (
-                <Pressable key={move.id} onPress={() => openDetail(move)}>
+                <Pressable key={move.id} onPress={() => !isLocked && openDetail(move)} disabled={isLocked}>
                   <Animated.View
                     style={[
                       styles.moveCard,
@@ -515,20 +573,40 @@ const [moveXP, setMoveXP] = useState<Record<string, number>>({});
                       index < MOVES.length - 1 && { marginBottom: CARD_GAP },
                     ]}
                   >
-                    <View style={styles.animArea}>
-                      <View style={styles.typeBadge}>
-                        <Text style={styles.typeBadgeText}>{move.type.toUpperCase()}</Text>
-                      </View>
-                      <View style={styles.animFrame}>
-                        <Text style={styles.animFrameLabel}>Animation</Text>
-                        <Text style={styles.animFrameSub}>placeholder</Text>
-                      </View>
-                      <View style={styles.tapHint}>
-                        <Text style={styles.tapHintText}>TAP TO OPEN</Text>
-                      </View>
+                    <View style={[styles.animArea, isLocked && styles.animAreaLocked]}>
+                      {isLocked ? (
+                        <>
+                          <View style={[styles.typeBadge, styles.lockedBadge]}>
+                            <Text style={[styles.typeBadgeText, styles.lockedBadgeText]}>LOCKED</Text>
+                          </View>
+                          <View style={styles.lockBox}>
+                            <Text style={styles.lockBoxLabel}>LOCKED</Text>
+                          </View>
+                          <Text style={styles.lockPrereq}>Master the {prereqName} first</Text>
+                        </>
+                      ) : (
+                        (() => {
+                          const src = move.videoKey ? VIDEO_MAP[move.videoKey] : null;
+                          return src ? (
+                            <Video
+                              source={src}
+                              style={styles.cardVideo}
+                              resizeMode={ResizeMode.COVER}
+                              shouldPlay
+                              isLooping
+                              isMuted
+                            />
+                          ) : (
+                            <View style={styles.animFrame}>
+                              <Text style={styles.animFrameLabel}>Animation</Text>
+                              <Text style={styles.animFrameSub}>placeholder</Text>
+                            </View>
+                          );
+                        })()
+                      )}
                     </View>
                     <View style={styles.moveInfo}>
-                      <Text style={styles.moveName}>{move.name}</Text>
+                      <Text style={[styles.moveName, isLocked && styles.lockedText]}>{move.name}</Text>
                       <Text style={styles.moveDesc}>{move.description}</Text>
                     </View>
                   </Animated.View>
@@ -581,6 +659,10 @@ const [moveXP, setMoveXP] = useState<Record<string, number>>({});
               ];
               const scale   = scrollYStyles.interpolate({ inputRange, outputRange: [0.85, 1, 0.85], extrapolate: 'clamp' });
               const opacity = scrollYStyles.interpolate({ inputRange, outputRange: [0.45, 1, 0.45], extrapolate: 'clamp' });
+              const isStyleLocked = !!style.lockedBehind && (moveXP[style.lockedBehind] ?? 0) < 100;
+              const stylePrereqName = isStyleLocked
+                ? (MOVES.find(m => m.id === style.lockedBehind)?.name ?? 'required move')
+                : '';
 
               return (
                 <Animated.View
@@ -591,26 +673,52 @@ const [moveXP, setMoveXP] = useState<Record<string, number>>({});
                     index < FIGHTING_STYLES.length - 1 && { marginBottom: CARD_GAP },
                   ]}
                 >
-                  {/* Visual area */}
-                  <View style={styles.animArea}>
-                    <View style={styles.typeBadge}>
-                      <Text style={styles.typeBadgeText}>{style.tag}</Text>
-                    </View>
-                    <View style={styles.styleKeywordsBox}>
-                      {style.keywords.map((kw) => (
-                        <View key={kw} style={styles.styleKeywordPill}>
-                          <Text style={styles.styleKeywordText}>{kw}</Text>
+                  <View style={[styles.animArea, isStyleLocked && styles.animAreaLocked]}>
+                    {isStyleLocked ? (
+                      <>
+                        <View style={[styles.typeBadge, styles.lockedBadge]}>
+                          <Text style={[styles.typeBadgeText, styles.lockedBadgeText]}>LOCKED</Text>
                         </View>
-                      ))}
-                    </View>
-                    <View style={styles.tapHint}>
-                      <Text style={styles.tapHintText}>FIGHTING STYLE</Text>
-                    </View>
+                        <View style={styles.lockBox}>
+                          <Text style={styles.lockBoxLabel}>LOCKED</Text>
+                        </View>
+                        <Text style={styles.lockPrereq}>Master the {stylePrereqName} first</Text>
+                      </>
+                    ) : (
+                      <>
+                        <View style={styles.typeBadge}>
+                          <Text style={styles.typeBadgeText}>{style.tag}</Text>
+                        </View>
+                        {(() => {
+                          const src = style.videoKey ? VIDEO_MAP[style.videoKey] : null;
+                          return src ? (
+                            <Video
+                              source={src}
+                              style={styles.cardVideo}
+                              resizeMode={ResizeMode.COVER}
+                              shouldPlay
+                              isLooping
+                              isMuted
+                            />
+                          ) : (
+                            <View style={styles.styleKeywordsBox}>
+                              {style.keywords.map((kw) => (
+                                <View key={kw} style={styles.styleKeywordPill}>
+                                  <Text style={styles.styleKeywordText}>{kw}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          );
+                        })()}
+                        <View style={styles.tapHint}>
+                          <Text style={styles.tapHintText}>FIGHTING STYLE</Text>
+                        </View>
+                      </>
+                    )}
                   </View>
 
-                  {/* Info */}
                   <View style={styles.moveInfo}>
-                    <Text style={styles.moveName}>{style.name}</Text>
+                    <Text style={[styles.moveName, isStyleLocked && styles.lockedText]}>{style.name}</Text>
                     <Text style={styles.moveDesc}>{style.description}</Text>
                   </View>
                 </Animated.View>
@@ -826,13 +934,29 @@ const [moveXP, setMoveXP] = useState<Record<string, number>>({});
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.detailScroll}>
             {/* Demo area */}
             <View style={styles.detailAnimArea}>
-              <View style={styles.detailAnimFrame}>
-                <Text style={styles.detailAnimLabel}>Demo Animation</Text>
-                <Text style={styles.detailAnimSub}>placeholder</Text>
-              </View>
-              <Pressable style={styles.playBtn}>
-                <Text style={styles.playBtnText}>▶  Play Demo</Text>
-              </Pressable>
+              {(() => {
+                const src = selectedMove.videoKey ? VIDEO_MAP[selectedMove.videoKey] : null;
+                return src ? (
+                  <Video
+                    source={src}
+                    style={styles.detailVideo}
+                    resizeMode={ResizeMode.COVER}
+                    shouldPlay
+                    isLooping
+                    isMuted
+                  />
+                ) : (
+                  <>
+                    <View style={styles.detailAnimFrame}>
+                      <Text style={styles.detailAnimLabel}>Demo Animation</Text>
+                      <Text style={styles.detailAnimSub}>placeholder</Text>
+                    </View>
+                    <Pressable style={styles.playBtn}>
+                      <Text style={styles.playBtnText}>▶  Play Demo</Text>
+                    </Pressable>
+                  </>
+                );
+              })()}
             </View>
 
             {/* Move name */}
@@ -1105,6 +1229,7 @@ const styles = StyleSheet.create({
   detailAnimArea: {
     height: 220,
     backgroundColor: '#0e0e0e',
+    overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
     borderTopWidth: 1,
@@ -1548,6 +1673,59 @@ completePracticeBtn: {
   paddingVertical: 16,
   borderRadius: 16,
   alignItems: 'center',
+},
+
+// Videos
+cardVideo: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+},
+detailVideo: {
+  width: '100%',
+  height: '100%',
+},
+
+// Lock states
+animAreaLocked: {
+  backgroundColor: '#090909',
+},
+lockedBadge: {
+  backgroundColor: '#1a1a1a',
+  borderWidth: 1,
+  borderColor: '#222',
+},
+lockedBadgeText: {
+  color: '#333',
+},
+lockBox: {
+  width: 110,
+  height: 64,
+  borderRadius: 14,
+  borderWidth: 1,
+  borderColor: '#1e1e1e',
+  borderStyle: 'dashed',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+lockBoxLabel: {
+  color: '#252525',
+  fontSize: 13,
+  fontWeight: '900',
+  letterSpacing: 4,
+},
+lockPrereq: {
+  color: '#2e2e2e',
+  fontSize: 10,
+  fontWeight: '700',
+  letterSpacing: 1,
+  marginTop: 14,
+  textAlign: 'center',
+},
+lockedText: {
+  color: '#3a3a3a',
 },
 
 });
