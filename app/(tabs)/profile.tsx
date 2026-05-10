@@ -1,29 +1,32 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useProfile } from '@/context/ProfileContext';
 import { RANKS } from '@/data/quizQuestions';
 
-const FIGHT_IQ = 50;
+const SAVED_WORKOUTS_KEY = 'savedWorkouts';
+const SELECTED_WORKOUT_KEY = 'selectedWorkout';
+const RANK_XP_KEY = 'rankXP';
 
 function getRankInfo(score: number) {
   let current = RANKS[0];
+
   for (const r of RANKS) {
     if (score >= r.minScore) current = r;
   }
+
   const nextIndex = RANKS.indexOf(current) + 1;
   const next = nextIndex < RANKS.length ? RANKS[nextIndex] : null;
+
   const pct = next
     ? (score - current.minScore) / (next.minScore - current.minScore)
     : 1;
+
   return { current, next, pct };
 }
-
-const SAVED_WORKOUTS_KEY = 'savedWorkouts';
-const SELECTED_WORKOUT_KEY = 'selectedWorkout';
 
 type SavedWorkout = {
   title: string;
@@ -42,18 +45,27 @@ type SavedWorkout = {
 export default function ProfileScreen() {
   const { profile } = useProfile();
   const [savedWorkouts, setSavedWorkouts] = useState<SavedWorkout[]>([]);
-  const { current: currentRank, next: nextRank, pct: rankPct } = getRankInfo(FIGHT_IQ);
+  const [rankXP, setRankXP] = useState(0);
+
+  const { current: currentRank, next: nextRank, pct: rankPct } = getRankInfo(rankXP);
+
+  async function loadProfileData() {
+    const saved = await AsyncStorage.getItem(SAVED_WORKOUTS_KEY);
+    const xp = await AsyncStorage.getItem(RANK_XP_KEY);
+
+    setSavedWorkouts(saved ? JSON.parse(saved) : []);
+    setRankXP(xp ? JSON.parse(xp) : 0);
+  }
 
   useFocusEffect(
     useCallback(() => {
-      async function loadSavedWorkouts() {
-        const saved = await AsyncStorage.getItem(SAVED_WORKOUTS_KEY);
-        setSavedWorkouts(saved ? JSON.parse(saved) : []);
-      }
-
-      loadSavedWorkouts();
+      loadProfileData();
     }, [])
   );
+
+  useEffect(() => {
+    loadProfileData();
+  }, []);
 
   async function openSavedWorkout(workout: SavedWorkout) {
     await AsyncStorage.setItem(SELECTED_WORKOUT_KEY, JSON.stringify(workout));
@@ -93,27 +105,43 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>50</Text>
-          <Text style={styles.statLabel}>Fight IQ</Text>
+          <Text style={styles.statNumber}>{rankXP}</Text>
+          <Text style={styles.statLabel}>XP</Text>
         </View>
 
         <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: currentRank.color }]}>{currentRank.label}</Text>
+          <Text
+            style={[styles.statNumber, styles.rankStatText, { color: currentRank.color }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {currentRank.label}
+          </Text>
           <Text style={styles.statLabel}>Rank</Text>
         </View>
       </View>
 
       <View style={styles.card}>
         <View style={styles.rankRow}>
-          <Text style={[styles.rankLabel, { color: currentRank.color }]}>{currentRank.label}</Text>
-          {nextRank && (
-            <Text style={styles.rankNext}>{nextRank.minScore - FIGHT_IQ} pts to {nextRank.label}</Text>
+          <Text
+            style={[styles.rankLabel, { color: currentRank.color }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {currentRank.label}
+          </Text>
+
+          {nextRank ? (
+            <Text style={styles.rankNext}>{nextRank.minScore - rankXP} XP to {nextRank.label}</Text>
+          ) : (
+            <Text style={styles.rankNext}>Max rank reached</Text>
           )}
-          {!nextRank && <Text style={styles.rankNext}>Max rank reached</Text>}
         </View>
+
         <View style={styles.rankTrack}>
           <View style={[styles.rankFill, { width: `${rankPct * 100}%` as `${number}%`, backgroundColor: currentRank.color }]} />
         </View>
+
         <View style={styles.rankEndpoints}>
           <Text style={styles.rankMin}>{currentRank.minScore}</Text>
           {nextRank && <Text style={styles.rankMax}>{nextRank.minScore}</Text>}
@@ -137,20 +165,6 @@ export default function ProfileScreen() {
         )}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Strengths</Text>
-        <Text style={styles.text}>• Jab</Text>
-        <Text style={styles.text}>• Footwork</Text>
-        <Text style={styles.text}>• Distance control</Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Needs Work</Text>
-        <Text style={styles.text}>• Defense after combos</Text>
-        <Text style={styles.text}>• Low kick checks</Text>
-        <Text style={styles.text}>• Cardio in later rounds</Text>
-      </View>
-
       <Pressable style={styles.button}>
         <Text style={styles.buttonText}>Edit Profile</Text>
       </Pressable>
@@ -172,6 +186,7 @@ const styles = StyleSheet.create({
   statsContainer: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   statCard: { flex: 1, backgroundColor: '#1b1b1b', borderRadius: 16, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: '#2a2a2a' },
   statNumber: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  rankStatText: { fontSize: 15, maxWidth: '100%' },
   statLabel: { color: '#aaa', fontSize: 12, marginTop: 4, fontWeight: '600' },
   text: { color: '#d6d6d6', fontSize: 16, marginBottom: 8 },
   workoutCard: { backgroundColor: '#111', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#333' },
@@ -179,8 +194,8 @@ const styles = StyleSheet.create({
   openText: { color: '#ff3b30', fontSize: 14, fontWeight: '800', marginTop: 4 },
   button: { backgroundColor: '#ff3b30', borderRadius: 16, padding: 18, alignItems: 'center' },
   buttonText: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  rankRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  rankLabel: { fontSize: 16, fontWeight: '800', letterSpacing: 0.5 },
+  rankRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 12 },
+  rankLabel: { fontSize: 15, fontWeight: '800', letterSpacing: 0.5, flex: 1 },
   rankNext: { color: '#666', fontSize: 12, fontWeight: '600' },
   rankTrack: { height: 8, backgroundColor: '#1a1a1a', borderRadius: 4, overflow: 'hidden', marginBottom: 6 },
   rankFill: { height: '100%', borderRadius: 4 },

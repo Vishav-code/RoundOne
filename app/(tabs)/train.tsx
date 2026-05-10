@@ -24,6 +24,7 @@ type AIWorkout = {
 const SERVER_URL = 'http://10.12.132.1:3001';
 const SAVED_WORKOUTS_KEY = 'savedWorkouts';
 const SELECTED_WORKOUT_KEY = 'selectedWorkout';
+const RANK_XP_KEY = 'rankXP';
 
 export default function TrainScreen() {
   const [focuses, setFocuses] = useState<Focus[]>(['Technical']);
@@ -37,6 +38,8 @@ export default function TrainScreen() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
   const [completedRounds, setCompletedRounds] = useState<number[]>([]);
+  const [workoutXPAwarded, setWorkoutXPAwarded] = useState(false);
+  const [rankMessage, setRankMessage] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadSavedWorkouts() {
@@ -53,6 +56,8 @@ export default function TrainScreen() {
         setActiveRound(null);
         setTimeLeft(0);
         setTimerRunning(false);
+        setWorkoutXPAwarded(false);
+        setRankMessage(null);
 
         await AsyncStorage.removeItem(SELECTED_WORKOUT_KEY);
       }
@@ -69,23 +74,33 @@ export default function TrainScreen() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           setTimerRunning(false);
+
           if (activeRound !== null) {
-            setCompletedRounds((old) => old.includes(activeRound) ? old : [...old, activeRound]);
+            completeRound(activeRound);
           }
+
           return 0;
         }
+
         return prev - 1;
       });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [timerRunning, activeRound]);
+  }, [timerRunning, activeRound, completedRounds, workout, workoutXPAwarded]);
+
+  function getWorkoutXP() {
+    if (difficulty === 'Beginner') return 50;
+    if (difficulty === 'Intermediate') return 100;
+    return 175;
+  }
 
   function toggleFocus(item: Focus) {
     setFocuses((prev) => {
       if (prev.includes(item)) {
         return prev.length === 1 ? prev : prev.filter((focus) => focus !== item);
       }
+
       return [...prev, item];
     });
   }
@@ -123,9 +138,33 @@ export default function TrainScreen() {
     setTimerRunning(false);
   }
 
-  function completeRound(roundNumber: number) {
-    setCompletedRounds((prev) => prev.includes(roundNumber) ? prev : [...prev, roundNumber]);
+  async function awardRankXP() {
+  if (workoutXPAwarded) return;
+
+  const savedXP = await AsyncStorage.getItem(RANK_XP_KEY);
+  const currentXP = savedXP ? Number(JSON.parse(savedXP)) : 0;
+  const earnedXP = getWorkoutXP();
+  const newXP = currentXP + earnedXP;
+
+  await AsyncStorage.setItem(RANK_XP_KEY, JSON.stringify(newXP));
+
+  setWorkoutXPAwarded(true);
+  setRankMessage(`Workout complete! +${earnedXP} Rank XP`);
+}
+
+async function completeRound(roundNumber: number) {
+  if (!workout) return;
+
+  const updatedRounds = completedRounds.includes(roundNumber)
+    ? completedRounds
+    : [...completedRounds, roundNumber];
+
+  setCompletedRounds(updatedRounds);
+
+  if (updatedRounds.length === workout.rounds.length) {
+    await awardRankXP();
   }
+}
 
   async function saveWorkout() {
     if (!workout) return;
@@ -146,6 +185,8 @@ export default function TrainScreen() {
       setTimeLeft(0);
       setTimerRunning(false);
       setCompletedRounds([]);
+      setWorkoutXPAwarded(false);
+      setRankMessage(null);
 
       const response = await fetch(`${SERVER_URL}/generate-workout`, {
         method: 'POST',
@@ -198,6 +239,7 @@ export default function TrainScreen() {
 
       setWorkout({ ...workout, rounds: updatedRounds });
       setCompletedRounds((prev) => prev.filter((round) => round !== roundIndex + 1));
+      setRankMessage(null);
     } catch (error) {
       console.log(error);
     } finally {
@@ -242,10 +284,13 @@ export default function TrainScreen() {
             <Text style={styles.summaryText}>Difficulty: {difficulty}</Text>
             <Text style={styles.summaryText}>Total Time: ~{Math.ceil(getTotalSeconds() / 60)} min</Text>
             <Text style={styles.summaryText}>Progress: {completedRounds.length}/{workout.rounds.length} rounds</Text>
+            <Text style={styles.summaryText}>Reward: +{getWorkoutXP()} Rank XP</Text>
 
             <View style={styles.progressBackground}>
               <View style={[styles.progressFill, { width: `${getProgressPercent()}%` }]} />
             </View>
+
+            {rankMessage && <Text style={styles.rankMessage}>{rankMessage}</Text>}
           </View>
 
           <Text style={styles.text}>Warmup: {workout.warmup}</Text>
@@ -331,6 +376,7 @@ const styles = StyleSheet.create({
   text: { color: '#ccc', fontSize: 15, marginBottom: 12 },
   summaryCard: { backgroundColor: '#111', borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#333' },
   summaryText: { color: '#ddd', fontSize: 14, marginBottom: 6, fontWeight: '700' },
+  rankMessage: { color: '#4ade80', fontSize: 15, fontWeight: '900', marginTop: 10 },
   progressBackground: { height: 10, backgroundColor: '#333', borderRadius: 10, overflow: 'hidden', marginTop: 8 },
   progressFill: { height: '100%', backgroundColor: '#ff3b30', borderRadius: 10 },
   roundCard: { backgroundColor: '#111', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#333' },
