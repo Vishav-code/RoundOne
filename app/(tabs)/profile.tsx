@@ -1,10 +1,11 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useProfile } from '@/context/ProfileContext';
+
 import { RANKS } from '@/data/quizQuestions';
 
 const SAVED_WORKOUTS_KEY = 'savedWorkouts';
@@ -43,7 +44,7 @@ type SavedWorkout = {
 };
 
 export default function ProfileScreen() {
-  const { profile } = useProfile();
+  const { profile, clearProfile } = useProfile();
   const [savedWorkouts, setSavedWorkouts] = useState<SavedWorkout[]>([]);
   const [rankXP, setRankXP] = useState(0);
 
@@ -66,6 +67,18 @@ export default function ProfileScreen() {
   useEffect(() => {
     loadProfileData();
   }, []);
+
+  function handleSignOut() {
+    Alert.alert('Sign Out', 'This will clear all your data and show the signup screen.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out', style: 'destructive', onPress: async () => {
+          await AsyncStorage.multiRemove([SAVED_WORKOUTS_KEY, SELECTED_WORKOUT_KEY, RANK_XP_KEY, 'moveXP']);
+          await clearProfile();
+        },
+      },
+    ]);
+  }
 
   async function openSavedWorkout(workout: SavedWorkout) {
     await AsyncStorage.setItem(SELECTED_WORKOUT_KEY, JSON.stringify(workout));
@@ -165,8 +178,8 @@ export default function ProfileScreen() {
         )}
       </View>
 
-      <Pressable style={styles.button}>
-        <Text style={styles.buttonText}>Edit Profile</Text>
+      <Pressable style={styles.button} onPress={handleSignOut}>
+        <Text style={styles.buttonText}>Sign Out</Text>
       </Pressable>
     </ScrollView>
   );
